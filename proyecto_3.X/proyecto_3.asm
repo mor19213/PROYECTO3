@@ -30,7 +30,27 @@ CONTADOR    RES 1
 SERVO3	    RES 1
 SERVO4	    RES 1
 SENAL3	    RES 1
-	   
+RECIBIDO    RES 1
+SERVO1_TX   RES 1
+SERVO2_TX   RES 1
+SERVO_T2    RES 1
+SERVO_T1    RES 1
+TX_B	    RES 1	
+SERVO1_R    RES 1
+SERVO2_R    RES 1
+SERVO1_T    RES 1
+SERVO2_T    RES 1
+SERVO11	    RES 1
+SERVO12	    RES 1
+SERVO21	    RES 1
+SERVO22	    RES 1
+CONTADOR2   RES 1
+CONTADOR3   RES 1
+SENAL	    RES 1
+PRUEBA	    RES 1
+PRUEBA2	    RES 1
+BANDERA1    RES 1
+BANDERA2    RES 1
    
    
 	    
@@ -52,7 +72,11 @@ ISR:
     BTFSC   PIR1, ADIF
     CALL    COSO_ADC	    ; CONVERSION
     BTFSC   INTCON, T0IF
-    CALL    COSO_TMR0
+    CALL    COSO_TMR0   
+    BTFSC   PIR1, RCIF
+    CALL    COSO_RX	    ; RECIBIR DATOS
+    BTFSC   PIR1, TXIF
+    CALL    COSO_TX
     
 POP:
     SWAPF   VAR_STATUS, W
@@ -63,29 +87,127 @@ POP:
 
 ;		    SUB-RUTINAS DE LA INTERRUPCION 
 ;*******************************************************************************
+   
+COSO_TX:
+    BTFSS   TX_B, 0
+    GOTO    PRIMERO
+    BTFSC   TX_B, 0
+    GOTO    SEGUNDO
+PRIMERO
+    BTFSC   TX_B, 1
+    GOTO    A1
+    MOVFW   SERVO1
+    ADDLW   0x30
+    MOVWF   TXREG
+    ;MOVLW   0x30
+    ;ADDWF   SERVO1, W
+    ;MOVWF   TXREG
+    BSF	    TX_B, 1
+    GOTO    TERMINARR
+    RETURN
+    
+    A1
+    MOVLW   .44
+    MOVWF   TXREG
+    BCF	    TX_B, 1
+    BSF	    TX_B, 0
+    GOTO    TERMINARR
+    RETURN
+    
+SEGUNDO
+    BTFSC   TX_B, 1
+    GOTO    A2
+    MOVLW   0x30
+    ADDWF   SERVO2, W
+    MOVWF   TXREG
+    BSF	    TX_B, 1
+    GOTO    TERMINARR
+    RETURN
+    
+    A2
+    MOVLW   .10
+    MOVWF   TXREG
+    BCF	    TX_B, 1
+    BCF	    TX_B, 0
+    GOTO    TERMINARR
+    RETURN
+
+    TERMINARR
+ ;BANKSEL TRISA
+ ;   BCF	    PIE1, TXIE
+ ;   BANKSEL PORTA
+    RETURN
+    
+COSO_RX:
+    
+    CLRF    BANDERA2
+    CLRF    PORTC
+    BCF	    PORTC, RC1
+    BCF	    PORTC, RC2
+    
+    MOVLW   0x31
+    SUBWF   RCREG, W
+    BTFSC   STATUS, Z
+    BSF	    PORTC, RC0
+    BSF	    BANDERA2, 0
+    
+    MOVLW   0x32
+    SUBWF   RCREG, W
+    BTFSC   STATUS, Z
+    BSF	    PORTC, RC3
+    BSF	    BANDERA2, 1
+    
+    MOVLW   0x33
+    SUBWF   RCREG, W
+    BTFSC   STATUS, Z
+    BSF	    PORTC, RC4
+    BSF	    BANDERA2, 2
+    
+    MOVLW   0x34
+    SUBWF   RCREG, W
+    BTFSC   STATUS, Z
+    BSF	    PORTC, RC5
+    BSF	    BANDERA2, 3
+    
+    RETURN
+    
 COSO_TMR0:
+    
     MOVFW   CONTADOR
     SUBLW   .30
     BTFSS   STATUS, Z
     GOTO    BANDERAS
     CLRF    CONTADOR
    
-    BSF	    PORTB, RB0
+    ;BSF	    PORTB, RB0
     BSF	    PORTB, RB1
     BSF	    PORTB, RB2
+    ;BSF	    PORTB, RB3
+    BSF	    PORTB, RB4
+    ;CALL    COSO_TX
     
     BANDERAS
     
     COSO1
-    MOVFW   CONTADOR
-    SUBWF   SERVO3
-    BTFSC   STATUS, Z
-    BCF	    PORTB, RB0
+    ;MOVFW   CONTADOR
+    ;BTFSC   PORTB, RB7
+    ;SUBLW   .10
+    ;BTFSS   PORTB, RB7
+    ;SUBLW   .2
+    ;BTFSC   STATUS, Z
+    ;BCF    PORTB, RB1
     
     MOVFW   CONTADOR
-    SUBWF   SERVO4
+    SUBWF   SERVO2_T
+    ;SUBLW   .7
     BTFSC   STATUS, Z
     BCF    PORTB, RB1
+    
+    MOVFW   CONTADOR
+    SUBWF   SERVO1_T
+    ;SUBLW   .7
+    BTFSC   STATUS, Z
+    BCF    PORTB, RB2
     
     MOVFW   CONTADOR
     BTFSC   PORTB, RB6
@@ -93,9 +215,19 @@ COSO_TMR0:
     BTFSS   PORTB, RB6
     SUBLW   .2
     BTFSC   STATUS, Z
-    BCF    PORTB, RB2
-
+    BCF    PORTB, RB4
     
+    BTFSS   CONTADOR2, 7
+    GOTO    T
+    INCF    CONTADOR3, 1
+    CLRF    CONTADOR2
+    ;BTFSS   CONTADOR3, 5
+   ;GOTO    T
+    ;CLRF    CONTADOR3
+    INCF    SENAL, 1
+    
+    T
+    INCF    CONTADOR2, 1
     INCF    CONTADOR, 1
     BCF	    INTCON, T0IF 
     RETURN
@@ -103,20 +235,28 @@ COSO_TMR0:
 COSO_ADC:
    BTFSC    BANDERA, 0
    GOTO	    COSO2
-  ; COSO1	     ; VARIAR EN QUE VARIABLE SE GUARDA EL VALOR Y EL CANAL	    
-   MOVFW    ADRESH	   
-   MOVWF    SERVO2	    ;VALOR DE ADRESH A VARIABLE ENVIAR
+   
+   SWAPF    ADRESH, W
+   MOVWF    SERVO_T2
+   RRF	    SERVO_T2, 0
+   ANDLW    b'00000111'
+   ADDLW    .2
+   MOVWF    SERVO2
    BSF	    BANDERA, 0
    BSF	    ADCON0, 2
-   CALL	    DELAY_2	; DARLE TIEMPO ANTES DE LA SIGUIENTE CONVERSION
+   ;CALL	    DELAY_2	
    GOTO	    TERMINAR
    
    COSO2	    ; CONVERSION EN EL CANAL AN1
-   MOVFW    ADRESH  ; GUARDAR VALOR EN LA VARIABLE PARA EL EJE Y
+   SWAPF    ADRESH, W
+   MOVWF    SERVO_T1
+   RRF	    SERVO_T1, 0
+   ANDLW    b'00000111'
+   ADDLW    .2
    MOVWF    SERVO1	  
    BCF	    BANDERA, 0
    BCF	    ADCON0, 2
-   CALL	    DELAY_2
+   ;CALL	    DELAY_2
    
    TERMINAR
    BSF	    ADCON0, GO
@@ -132,24 +272,26 @@ START			    ; CONFIGURACIONES
    CALL	    CONFIG_ADC
    CALL	    CONFIG_INTERRUPT
    CALL	    CONFIG_TMR0
-   CALL	    CONFIG_INTERRUPT0
+   CALL	    CONFIG_SERIAL
+   BANKSEL  PORTA
    GOTO	    LOOP
    
 LOOP:
-    
-    MOVLW   .4
-    MOVWF   SERVO3
-    MOVLW   .10
-    MOVWF   SERVO4
-    
-    BTFSC   PORTD, RD2
+   ;MOVLW    0x2
+   ;MOVWF    SERVO1
+   ;MOVLW    0x4
+   ;MOVWF    SERVO2
+   ;MOVLW    0x8
+   ;MOVWF    SERVO3
+
+   
+    BTFSC   PORTD, RD3
     CALL    INC_MODO
     
-    MOVFW   MODO
-    SUBLW   .0
-    BTFSC   STATUS, Z
-    GOTO    MODO1
-    
+    ;BANKSEL TRISA
+    ;BSF	    PIE1, TXIE
+    ;BANKSEL PORTA
+        
     MOVFW   MODO
     SUBLW   .1
     BTFSC   STATUS, Z
@@ -159,47 +301,104 @@ LOOP:
     SUBLW   .2
     BTFSC   STATUS, Z
     GOTO    MODO3
-    GOTO    LOOP
     
-MODO3
-    GOTO    LOOP
+    MOVFW   MODO
+    SUBLW   .0
+    BTFSC   STATUS, Z
+    GOTO    MODO1
 
-MODO2
-    CALL    LEER
-    MOVFW   SERVO2_EEPROM
-    MOVWF   CCPR2L
+    GOTO    LOOP
     
+MODO3:
+    BTFSC   PORTC, RC0
+    GOTO    SE1
+    BTFSC   PORTC, RC3
+    GOTO    SE2
+    BTFSC   PORTC, RC4
+    GOTO    SE3
+    BTFSC   PORTC, RC5
+    GOTO    SE4
+    GOTO    LOOP
+    
+SE1
+    BTFSC   SENAL, 5
+    MOVLW   .8
+    BTFSS   SENAL, 5
+    MOVLW   .2
+    MOVWF   SERVO1_T
+    
+    BTFSC   SENAL, 5
+    MOVLW   .8   
+    BTFSS   SENAL, 5
+    MOVLW   .2
+    MOVWF   SERVO2_T
+    GOTO	LOOP 
+    
+SE2
+    BTFSC   SENAL, 5
+    MOVLW   .8
+    BTFSS   SENAL, 5
+    MOVLW   .2
+    MOVWF   SERVO1_T
+    
+    BTFSC   SENAL, 5
+    MOVLW   .2   
+    BTFSS   SENAL, 5
+    MOVLW   .8
+    MOVWF   SERVO2_T
+    GOTO	LOOP 
+    
+SE3
+    BTFSC   SENAL, 5
+    MOVLW   .4
+    BTFSS   SENAL, 5
+    MOVLW   .9
+    MOVWF   SERVO1_T
+    
+    BTFSC   SENAL, 5
+    MOVLW   .4  
+    BTFSS   SENAL, 5
+    MOVLW   .4
+    MOVWF   SERVO2_T
+    GOTO	LOOP 
+    
+SE4
+    BTFSC   SENAL, 6
+    MOVLW   .4
+    BTFSS   SENAL, 6
+    MOVLW   .2
+    MOVWF   SERVO1_T
+    
+    BTFSC   SENAL, 6
+    MOVLW   .4
+    BTFSS   SENAL, 6
+    MOVLW   .2
+    MOVWF   SERVO2_T
+    GOTO	LOOP 
+
+MODO2:
+    ;CALL    LEER
     MOVFW   SERVO1_EEPROM
-    MOVWF   CCPR1L
-    BCF	    PORTB, RB2
+    MOVWF   SERVO1_T
+    
+    MOVFW   SERVO2_EEPROM
+    MOVWF   SERVO2_T
     GOTO    LOOP
     
     
-MODO1
-    
-    BSF	    PORTB, RB3
-    BCF	    PORTB, RB2
-    ;BTFSS   PORTD, RD4
-    ;GOTO    SERVOS
-    ;PRUEBA
-    ;BSF	    PORTB, RB2
-    ;CALL    ESCRITURA
-    
- SERVOS
-    RRF	    SERVO1, 0
-    ANDLW   b'01111111'
-    ADDLW   .32
-    MOVWF   CCPR1L
-    
-    RRF	    SERVO2, 0
-    ANDLW   b'01111111'
-    ADDLW   .32
-    MOVWF   CCPR2L
-    
+MODO1:
     BSF	    ADCON0, GO
-    BTFSS   PORTD, RD4
+    
+    
+    MOVFW   SERVO1
+    MOVWF   SERVO1_T
+    MOVFW   SERVO2
+    MOVWF   SERVO2_T
+
+    ;BTFSS   PORTD, RD4
     GOTO    LOOP
-    GOTO    ESCRITURA
+    
+    ;GOTO    ESCRITURA
     GOTO    LOOP
     
 ;**************************** SUBRUTINAS ***************************************
@@ -247,14 +446,10 @@ SEGUNDOSERVO
        
     
 ESCRITURA:
-    BANKSEL EECON1
-    ES2
-    BTFSC   EECON1, WR
-    GOTO    ES2
     BANKSEL EEADR
     MOVLW   .0
     MOVWF   EEADR
-    BANKSEL PORTA
+    BANKSEL CCPR2L
     MOVFW   CCPR2L
     BANKSEL EEDATA
     MOVWF   EEDATA
@@ -262,29 +457,26 @@ ESCRITURA:
     BANKSEL EECON1
     BCF	    EECON1, EEPGD
     BSF	    EECON1, WREN
+    
+    
     BCF	    INTCON, GIE
-    BTFSC   INTCON, GIE
-    GOTO    $-2
     
     MOVLW   0x55
     MOVWF   EECON2
     MOVLW   0xAA
     MOVWF   EECON2
     BSF	    EECON1, WR
+    
     ;BSF	    INTCON, GIE
     BCF	    EECON1, WREN
     
     BANKSEL PORTA
     
 PRIMERCOSO
-    BANKSEL EECON1
-    ES1
-    BTFSC   EECON1, WR
-    GOTO    ES1
     BANKSEL EEADR
     MOVLW   .1
     MOVWF   EEADR
-    BANKSEL PORTA
+    BANKSEL CCPR1L
     MOVFW   CCPR1L
     BANKSEL EEDATA
     MOVWF   EEDATA
@@ -293,9 +485,6 @@ PRIMERCOSO
     BCF	    EECON1, EEPGD
     BSF	    EECON1, WREN
     BCF	    INTCON, GIE
-    BTFSC   INTCON, GIE
-    GOTO    $-2
-    
     MOVLW   0x55
     MOVWF   EECON2
     MOVLW   0xAA
@@ -308,7 +497,7 @@ PRIMERCOSO
     GOTO    LOOP
     
 INC_MODO
-    BTFSC   PORTD, RD2
+    BTFSC   PORTD, RD3
     GOTO    INC_MODO
     INCF    MODO
     
@@ -373,7 +562,7 @@ UGHHHHHH:
    MOVFW    OSCCON
    RETURN
 
-CONFIG_TMR0
+CONFIG_TMR0:
     BANKSEL OPTION_REG
     BCF	    OPTION_REG, T0CS
     BSF	    OPTION_REG, PSA
@@ -386,15 +575,8 @@ CONFIG_TMR0
     MOVWF   TMR0
     BCF	    INTCON, T0IF
     RETURN
- 
-CONFIG_INTERRUPT0
-    ; CUANDO SE PRENDE LA BANDERA HABRA UNA INTERRUPCION
-    BSF	    INTCON, GIE
-    BSF	    INTCON, T0IE
-    BCF	    INTCON, T0IF
-    RETURN
     
-CONFIG_IO
+CONFIG_IO:
    BANKSEL  ANSEL
    CLRF	    ANSEL
    BSF	    ANSEL, 0	; CONFIGURAR ANSEL PARA EL CANAL AN0 Y AN1
@@ -408,6 +590,7 @@ CONFIG_IO
    COMF	    TRISD
    CLRF	    TRISB
    BSF	    TRISB, 6
+   BSF	    TRISB, 7
    BANKSEL  PORTD
    CLRF	    PORTB
    CLRF	    PORTA
@@ -415,8 +598,12 @@ CONFIG_IO
    CLRF	    PORTD
    CLRF	    MODO
    CLRF	    CONTADOR
-   CLRF	    SERVO3
-   CLRF	    SERVO4
+   MOVLW    0x2
+   MOVWF    SERVO1
+   MOVLW    0x2
+   MOVWF    SERVO2
+   MOVLW    0x2
+   MOVWF    SERVO3
    RETURN
    
 CONFIG_ADC:		    ; CONFIGURACION ADC
@@ -432,9 +619,38 @@ CONFIG_INTERRUPT:
     BSF	    PIE1, ADIE
     BSF	    INTCON, PEIE
     
+    BSF	    PIE1, RCIE
+    BSF	    PIE1, TXIE
+    BSF	    INTCON, T0IE
+    BSF	    INTCON, PEIE
+    
     BANKSEL PORTA
-    ;BSF	    INTCON, GIE
+    BSF	    INTCON, GIE
+    
+    BCF	    INTCON, T0IF
     RETURN
+    
+  
+CONFIG_SERIAL
+    BANKSEL TXSTA	    ; CONFIGURACION DEL TX
+    BCF	    TXSTA, SYNC
+    BSF	    TXSTA, TXEN
+    BSF	    TXSTA, BRGH
+    BCF	    TXSTA, TX9
+    
+    BANKSEL BAUDCTL	    ; CONFIGURACION DE LA VELOCIDAD
+    BCF	    BAUDCTL, BRG16
+    BANKSEL SPBRG
+    MOVLW   .25
+    MOVWF   SPBRG
+    CLRF    SPBRGH
+    BANKSEL RCSTA
+    BSF	    RCSTA, SPEN	    ; CONFIGURACION DEL RX
+    BCF	    RCSTA, RX9
+    BSF	    RCSTA, CREN
+    BANKSEL PORTA
+    RETURN
+
     
     DELAY_1		    ; DELAYS
     MOVLW   .250
@@ -453,4 +669,5 @@ CONFIG_INTERRUPT:
     GOTO    CONFIG2
     RETURN
 
+    
 END
